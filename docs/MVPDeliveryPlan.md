@@ -11,7 +11,7 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - **Authentication:** accept signed bearer tokens and derive the user identity and role only from validated token claims. Keep signing configuration outside source control. Require an admin role to create shows.
 - **API contract:** endpoint-specific success DTOs preserve the assignment's JSON fields. All errors use the shared error response and request ID already scaffolded in the service.
 
-**Overall progress:** Phases 0, 1, 2, and 3 are complete, including user-reported runtime smoke verification. Parallel correctness/load verification, observability enhancements, and public deployment remain.
+**Overall progress:** Phases 0 through 4 are complete. Phases 0–3 include user-reported runtime verification; Phase 4 has automated PostgreSQL integration coverage and passed verification. Observability enhancements, burst tooling, and public deployment remain.
 
 ## Delivery sequence
 
@@ -58,15 +58,15 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - [x] Implement show state with per-seat status and counts derived from persisted reservations.
 - [x] Map expected conflicts (unavailable seat, limit exceeded, key/body mismatch, missing show/reservation) to documented 4xx responses.
 
-**Gate:** The user reports the reservation workflow works at runtime. The `scripts/reservation-flow.http` flow covers show creation/state, idempotent replay and mismatch, seat conflicts, user limits, owner-only cancellation, and rebooking. Parallel contention storms and explicit transactional rollback verification remain in Phase 4.
+**Gate:** The user reports the reservation workflow works at runtime. The `scripts/reservation-flow.http` flow covers show creation/state, idempotent replay and mismatch, seat conflicts, user limits, owner-only cancellation, and rebooking. Phase 4 adds automated PostgreSQL verification for contention, rollback, and reconciliation.
 
 ### 4. Correctness verification
 
-- [ ] Add integration coverage against PostgreSQL for seat contention, same-key retries, same-key/different-body, per-user limit races, multi-seat rollback, cancellation ownership, and inventory reconciliation.
-- [ ] Run parallel tests repeatedly; assert one winner for a hot seat, no expected 5xx responses, user limit respected, and available + held + confirmed equals total.
-- [ ] Fix any race, deadlock, or response-contract discrepancy before adding deployment work.
+- [x] Add integration coverage against PostgreSQL for seat contention, same-key retries, same-key/different-body, per-user limit races, multi-seat rollback, cancellation ownership, and inventory reconciliation.
+- [x] Run parallel tests repeatedly; assert one winner for a hot seat, no expected 5xx responses, user limit respected, and available + held + confirmed equals total.
+- [x] Review race, deadlock, rollback, and response-contract outcomes; no discrepancy surfaced in this verification run.
 
-**Gate:** correctness scenarios pass against the same database engine used for deployment.
+**Gate:** `mvn -q test` passed against an isolated PostgreSQL 16 container. The integration suite verified all listed scenarios, including 20 concurrent requests for one seat (one success, 19 expected conflicts, zero 5xx), six simultaneous reservations constrained by a user's limit of two, and three repeated hot-seat runs. Testcontainers is the default test database provider; `TEST_DATABASE_URL`, `TEST_DATABASE_USERNAME`, and `TEST_DATABASE_PASSWORD` can target an explicitly started test database. This validates correctness under the tested contention, not the assignment's 20,000-request capacity target; that remains part of Phase 5 burst/load work.
 
 ### 5. Observability and burst tool
 

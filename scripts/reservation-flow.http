@@ -24,7 +24,7 @@ Content-Type: application/json
 
 ### 2. Create a small show with a per-user limit of two seats
 POST {{baseUrl}}/shows
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiZWE3N2Y1YWQtY2FmMy00M2Q5LTkwNTQtMTFhNmQ2NmU0ZDRhIiwiZXhwIjoxNzkxMDY4NjQxLCJpYXQiOjE3OTEwNjUwNDEsInJvbGVzIjpbIkFETUlOIl19.hNAlhaINWt7UREtDWVNRBvaiz3ZNYyInPDihhRExV44
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiZWE3N2Y1YWQtY2FmMy00M2Q5LTkwNTQtMTFhNmQ2NmU0ZDRhIiwiZXhwIjoxNzkxMDcxMDQxLCJpYXQiOjE3OTEwNjc0NDEsInJvbGVzIjpbIkFETUlOIl19.ZUuZ0EMpzZhLlCvksVHoLab1jGUs89rlalHNm2FiikY
 Content-Type: application/json
 
 {
@@ -43,24 +43,25 @@ Content-Type: application/json
   client.global.set("reservationShowId", response.body.id);
 %}
 
-{
-  "id": "b5875bdb-77ea-4c4f-88b9-8f1d2fe73626",
-  "name": "reservation-smoke-fa3716c3-4d6e-42bb-9880-e065fcb8029f",
-  "seats": [
-    {
-      "seat": "A1",
-      "status": "available"
-    },
-    {
-      "seat": "A2",
-      "status": "available"
-    },
-    {
-      "seat": "A3",
-      "status": "available"
-    }
-  ]
-}
+# RESPONSE
+# {
+#   "id": "dee38c39-1b34-4b26-90f1-d3635a536330",
+#   "name": "reservation-smoke-cd16cfdf-2c1f-4f39-b6b0-1fd88ab4a8c6",
+#   "seats": [
+#     {
+#       "seat": "A1",
+#       "status": "available"
+#     },
+#     {
+#       "seat": "A2",
+#       "status": "available"
+#     },
+#     {
+#       "seat": "A3",
+#       "status": "available"
+#     }
+#   ]
+# }
 
 ### 3. Create the first buyer account
 POST {{baseUrl}}/users
@@ -80,12 +81,13 @@ Content-Type: application/json
   client.global.set("reservationBuyerOneEmail", response.body.email);
 %}
 
-{
-  "id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
-  "email": "reservation-buyer-one-fedf438c-134b-431c-a918-32a3e054e642@example.test",
-  "role": "USER",
-  "active": true
-}
+# RESPONSE
+# {
+#   "id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
+#   "email": "reservation-buyer-one-fedf438c-134b-431c-a918-32a3e054e642@example.test",
+#   "role": "USER",
+#   "active": true
+# }
 
 ### 4. Sign in the first buyer
 POST {{baseUrl}}/auth/signin
@@ -103,14 +105,14 @@ Content-Type: application/json
   client.global.set("reservationBuyerOneToken", response.body.access_token);
 %}
 
-
-{
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM",
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "user_id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
-  "role": "USER"
-}
+# RESPONSE
+# {
+#   "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDcxMTE0LCJpYXQiOjE3OTEwNjc1MTQsInJvbGVzIjpbIlVTRVIiXX0.I2Nf3HVSD7zUM8Z-1cAkTWso-Ife4PTVUh3A9_MguT8",
+#   "token_type": "Bearer",
+#   "expires_in": 3600,
+#   "user_id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
+#   "role": "USER"
+# }
 
 ### 5. Reserve A1
 POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve

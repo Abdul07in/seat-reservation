@@ -2,7 +2,7 @@ spring:
   application:
     name: seat-reservation
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/seat_reservation}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/seat_reservation_test}
     username: ${DATABASE_USERNAME:seat_reservation}
     password: ${DATABASE_PASSWORD:seat_reservation}
     driver-class-name: org.postgresql.Driver
