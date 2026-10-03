@@ -11,7 +11,7 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - **Authentication:** accept signed bearer tokens and derive the user identity and role only from validated token claims. Keep signing configuration outside source control. Require an admin role to create shows.
 - **API contract:** endpoint-specific success DTOs preserve the assignment's JSON fields. All errors use the shared error response and request ID already scaffolded in the service.
 
-**Overall progress:** Phases 0, 1, and 2 are complete. Reservation endpoints, concurrency verification, observability enhancements, and public deployment remain.
+**Overall progress:** Phases 0, 1, 2, and 3 are complete, including user-reported runtime smoke verification. Parallel correctness/load verification, observability enhancements, and public deployment remain.
 
 ## Delivery sequence
 
@@ -45,20 +45,20 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - [x] Add `POST /auth/signin` for buyer email and bootstrap-admin identifier sign-in; assign roles server-side and never accept a requested role.
 - Idempotency header validation and controller handling are part of Phase 3, alongside the reservation endpoint.
 
-**Gate:** API behavior, payloads, and error responses are documented in `docs/ApiContract.md`; Maven package compilation succeeded. Runtime smoke checks have not yet been run. Use `scripts/test-auth.sh` or the sequential workflow in `scripts/auth-flow.http` against a running local service.
+**Gate:** API behavior, payloads, and error responses are documented in `docs/ApiContract.md`; Maven package compilation succeeded, and the user reports the authentication and user-account flows work at runtime.
 
-### 3. Reservation correctness
+### 3. Reservation correctness — complete
 
-- [ ] Implement show creation with all seats initially available.
-- [ ] Implement one transactional, all-or-nothing reservation operation using deterministic locking and database constraints.
-- [ ] Enforce the per-user limit (default four) within the same transaction as seat assignment.
-- [ ] Persist the idempotency key and a canonical request fingerprint. Same key + same request returns the original reservation; same key + different seats returns 409.
-- [ ] Validate and process the `Idempotency-Key` request header for reservation requests.
-- [ ] Implement owner-only cancellation that frees only seats still linked to that reservation.
-- [ ] Implement show state with per-seat status and counts from authoritative persisted state.
-- [ ] Map expected conflicts (seat taken, limit exceeded, key/body mismatch, missing show/reservation) to documented domain responses, never 500s.
+- [x] Implement show creation with all seats initially available.
+- [x] Implement one transactional, all-or-nothing reservation operation using a per-user/show PostgreSQL advisory lock and deterministically ordered seat-row locks.
+- [x] Enforce the per-user limit (default four) within the same transaction as seat assignment.
+- [x] Persist the idempotency key and canonical, order-independent seat fingerprint. Same key + same request returns the original reservation; same key + different seats returns 409.
+- [x] Validate and process the `Idempotency-Key` request header for reservation requests.
+- [x] Implement owner-only cancellation; serialize with the owner's reservations and lock linked seats before marking a reservation cancelled.
+- [x] Implement show state with per-seat status and counts derived from persisted reservations.
+- [x] Map expected conflicts (unavailable seat, limit exceeded, key/body mismatch, missing show/reservation) to documented 4xx responses.
 
-**Gate:** transaction rollback leaves no partial booking; cancellation and retries cannot free or assign seats owned by another reservation.
+**Gate:** The user reports the reservation workflow works at runtime. The `scripts/reservation-flow.http` flow covers show creation/state, idempotent replay and mismatch, seat conflicts, user limits, owner-only cancellation, and rebooking. Parallel contention storms and explicit transactional rollback verification remain in Phase 4.
 
 ### 4. Correctness verification
 

@@ -1,0 +1,373 @@
+### REST Client workflow: send requests from top to bottom; each response handler captures IDs/tokens for later requests.
+### It creates one test show (which remains in the database) and deactivates only the two temporary buyer accounts.
+@baseUrl = http://localhost:8080
+@adminIdentifier = admin
+@adminPassword = admin123
+@testPassword = ReservationSmokePass123!
+
+### 1. Admin signs in
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "identifier": "{{adminIdentifier}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+  client.test("admin sign-in succeeds", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(response.body.role === "ADMIN", "Expected ADMIN role");
+  });
+  client.global.set("reservationAdminToken", response.body.access_token);
+%}
+
+### 2. Create a small show with a per-user limit of two seats
+POST {{baseUrl}}/shows
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiZWE3N2Y1YWQtY2FmMy00M2Q5LTkwNTQtMTFhNmQ2NmU0ZDRhIiwiZXhwIjoxNzkxMDY4NjQxLCJpYXQiOjE3OTEwNjUwNDEsInJvbGVzIjpbIkFETUlOIl19.hNAlhaINWt7UREtDWVNRBvaiz3ZNYyInPDihhRExV44
+Content-Type: application/json
+
+{
+  "name": "reservation-smoke-{{$guid}}",
+  "seats": ["A1", "A2", "A3"],
+  "price_paise": 25000,
+  "per_user_limit": 2
+}
+
+> {%
+  client.test("show is created with available seats", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+    client.assert(response.body.seats.length === 3, "Expected three seats");
+    client.assert(response.body.seats.every(seat => seat.status === "available"), "Expected all seats available");
+  });
+  client.global.set("reservationShowId", response.body.id);
+%}
+
+{
+  "id": "b5875bdb-77ea-4c4f-88b9-8f1d2fe73626",
+  "name": "reservation-smoke-fa3716c3-4d6e-42bb-9880-e065fcb8029f",
+  "seats": [
+    {
+      "seat": "A1",
+      "status": "available"
+    },
+    {
+      "seat": "A2",
+      "status": "available"
+    },
+    {
+      "seat": "A3",
+      "status": "available"
+    }
+  ]
+}
+
+### 3. Create the first buyer account
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "reservation-buyer-one-{{$guid}}@example.test",
+  "password": "{{testPassword}}"
+}
+
+> {%
+  client.test("first buyer is created", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+    client.assert(response.body.role === "USER", "Expected USER role");
+  });
+  client.global.set("reservationBuyerOneId", response.body.id);
+  client.global.set("reservationBuyerOneEmail", response.body.email);
+%}
+
+{
+  "id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
+  "email": "reservation-buyer-one-fedf438c-134b-431c-a918-32a3e054e642@example.test",
+  "role": "USER",
+  "active": true
+}
+
+### 4. Sign in the first buyer
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "identifier": "reservation-buyer-one-fedf438c-134b-431c-a918-32a3e054e642@example.test",
+  "password": "{{testPassword}}"
+}
+
+> {%
+  client.test("first buyer sign-in succeeds", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+  });
+  client.global.set("reservationBuyerOneToken", response.body.access_token);
+%}
+
+
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user_id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
+  "role": "USER"
+}
+
+### 5. Reserve A1
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+Idempotency-Key: smoke-key-a1
+Content-Type: application/json
+
+{"seats": ["A1"]}
+
+> {%
+  client.test("first A1 reservation succeeds", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+    client.assert(response.body.seats[0] === "A1", "Expected A1 in reservation");
+    client.assert(response.body.amount_paise === 25000, "Expected amount in paise");
+  });
+  client.global.set("reservationA1Id", response.body.reservation_id);
+%}
+
+{
+  "reservation_id": "6710fcc9-f08f-4b46-8233-3adc670465f7",
+  "show_id": "b5875bdb-77ea-4c4f-88b9-8f1d2fe73626",
+  "user_id": "67b97954-fb11-47f7-ade3-8f9d83415da8",
+  "seats": [
+    "A1"
+  ],
+  "amount_paise": 25000,
+  "status": "confirmed"
+}
+
+### 6. Retry same key and body; original reservation should be returned
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+Idempotency-Key: smoke-key-a1
+Content-Type: application/json
+
+{"seats": ["A1"]}
+
+> {%
+  client.test("same-key retry returns the original reservation", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+    client.assert(response.body.reservation_id === client.global.get("reservationA1Id"), "Expected original reservation id");
+  });
+%}
+
+### 7. Same key with different seats must conflict
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+Idempotency-Key: smoke-key-a1
+Content-Type: application/json
+
+{"seats": ["A2"]}
+
+> {%
+  client.test("reusing a key with different seats is rejected", function () {
+    client.assert(response.status === 409, "Expected HTTP 409");
+    client.assert(response.body.code === "IDEMPOTENCY_KEY_REUSED", "Expected idempotency conflict code");
+  });
+%}
+
+### 8. Unknown seat in a multi-seat request must fail atomically
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+Idempotency-Key: smoke-key-invalid-seat
+Content-Type: application/json
+
+{"seats": ["A2", "A9"]}
+
+> {%
+  client.test("unknown seat rejects the whole request", function () {
+    client.assert(response.status === 409, "Expected HTTP 409");
+    client.assert(response.body.code === "SEAT_UNAVAILABLE", "Expected seat conflict code");
+  });
+%}
+
+### 9. A1 contention from a different user must conflict
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "reservation-buyer-two-{{$guid}}@example.test",
+  "password": "{{testPassword}}"
+}
+
+> {%
+  client.test("second buyer is created", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+  });
+  client.global.set("reservationBuyerTwoId", response.body.id);
+  client.global.set("reservationBuyerTwoEmail", response.body.email);
+%}
+
+{
+  "id": "54181840-0155-469c-88af-3ea25a913de1",
+  "email": "reservation-buyer-two-b4acdc0d-7bfb-46a8-9786-a2866ea262ca@example.test",
+  "role": "USER",
+  "active": true
+}
+
+### 10. Sign in the second buyer
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "identifier": "reservation-buyer-two-b4acdc0d-7bfb-46a8-9786-a2866ea262ca@example.test",
+  "password": "{{testPassword}}"
+}
+
+> {%
+  client.test("second buyer sign-in succeeds", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+  });
+  client.global.set("reservationBuyerTwoToken", response.body.access_token);
+%}
+
+
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNTQxODE4NDAtMDE1NS00NjljLTg4YWYtM2VhMjVhOTEzZGUxIiwiZXhwIjoxNzkxMDY5MTA4LCJpYXQiOjE3OTEwNjU1MDgsInJvbGVzIjpbIlVTRVIiXX0._DxOHHtJSZZOi1-xMA6CInH-_bCkx0O7rfXJmk6-uu8",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user_id": "54181840-0155-469c-88af-3ea25a913de1",
+  "role": "USER"
+}
+
+### 11. The second buyer cannot reserve A1
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNTQxODE4NDAtMDE1NS00NjljLTg4YWYtM2VhMjVhOTEzZGUxIiwiZXhwIjoxNzkxMDY5MTA4LCJpYXQiOjE3OTEwNjU1MDgsInJvbGVzIjpbIlVTRVIiXX0._DxOHHtJSZZOi1-xMA6CInH-_bCkx0O7rfXJmk6-uu8
+Idempotency-Key: smoke-key-a1-other-user
+Content-Type: application/json
+
+{"seats": ["A1"]}
+
+> {%
+  client.test("already-reserved seat is declined", function () {
+    client.assert(response.status === 409, "Expected HTTP 409");
+    client.assert(response.body.code === "SEAT_UNAVAILABLE", "Expected seat conflict code");
+  });
+%}
+
+### 12. Reserve A2 for buyer one (brings buyer one to their limit)
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+Idempotency-Key: smoke-key-a2
+Content-Type: application/json
+
+{"seats": ["A2"]}
+
+> {%
+  client.test("A2 reservation succeeds", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+  });
+%}
+
+### 13. Buyer one cannot exceed the two-seat limit
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+Idempotency-Key: smoke-key-a3-over-limit
+Content-Type: application/json
+
+{"seats": ["A3"]}
+
+> {%
+  client.test("per-user limit is enforced", function () {
+    client.assert(response.status === 409, "Expected HTTP 409");
+    client.assert(response.body.code === "USER_SEAT_LIMIT_EXCEEDED", "Expected seat-limit conflict code");
+  });
+%}
+
+### 14. A different buyer cannot cancel buyer one's reservation
+POST {{baseUrl}}/reservations/6710fcc9-f08f-4b46-8233-3adc670465f7/cancel
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNTQxODE4NDAtMDE1NS00NjljLTg4YWYtM2VhMjVhOTEzZGUxIiwiZXhwIjoxNzkxMDY5MTA4LCJpYXQiOjE3OTEwNjU1MDgsInJvbGVzIjpbIlVTRVIiXX0._DxOHHtJSZZOi1-xMA6CInH-_bCkx0O7rfXJmk6-uu8
+
+> {%
+  client.test("non-owner cancellation is forbidden", function () {
+    client.assert(response.status === 403, "Expected HTTP 403");
+  });
+%}
+
+### 15. Buyer one cancels A1
+POST {{baseUrl}}/reservations/6710fcc9-f08f-4b46-8233-3adc670465f7/cancel
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNjdiOTc5NTQtZmIxMS00N2Y3LWFkZTMtOGY5ZDgzNDE1ZGE4IiwiZXhwIjoxNzkxMDY4NzY4LCJpYXQiOjE3OTEwNjUxNjgsInJvbGVzIjpbIlVTRVIiXX0.9py6oJ-mdNnhFDOM7yUgoB3P6HJ7xxjgizr_C9WWYEM
+
+> {%
+  client.test("owner cancellation succeeds", function () {
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(response.body.status === "cancelled", "Expected cancelled status");
+  });
+%}
+
+### 16. Released A1 can be reserved by buyer two
+POST {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626/reserve
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiNTQxODE4NDAtMDE1NS00NjljLTg4YWYtM2VhMjVhOTEzZGUxIiwiZXhwIjoxNzkxMDY5MTA4LCJpYXQiOjE3OTEwNjU1MDgsInJvbGVzIjpbIlVTRVIiXX0._DxOHHtJSZZOi1-xMA6CInH-_bCkx0O7rfXJmk6-uu8
+Idempotency-Key: smoke-key-a1-after-cancel
+Content-Type: application/json
+
+{"seats": ["A1"]}
+
+> {%
+  client.test("cancelled seat can be booked again", function () {
+    client.assert(response.status === 201, "Expected HTTP 201");
+  });
+%}
+
+{
+  "reservation_id": "f9bf81f4-b5cf-482f-9986-cb65cb2a6b71",
+  "show_id": "b5875bdb-77ea-4c4f-88b9-8f1d2fe73626",
+  "user_id": "54181840-0155-469c-88af-3ea25a913de1",
+  "seats": [
+    "A1"
+  ],
+  "amount_paise": 25000,
+  "status": "confirmed"
+}
+
+### 17. Show counts and seat states reconcile
+GET {{baseUrl}}/shows/b5875bdb-77ea-4c4f-88b9-8f1d2fe73626
+
+> {%
+  client.test("show inventory reconciles", function () {
+    const body = response.body;
+    client.assert(response.status === 200, "Expected HTTP 200");
+    client.assert(body.total_seats === 3, "Expected three total seats");
+    client.assert(body.counts.available + body.counts.held + body.counts.confirmed === body.total_seats,
+      "Expected available + held + confirmed to equal total seats");
+    client.assert(body.counts.available === 1 && body.counts.confirmed === 2,
+      "Expected A1 and A2 confirmed with A3 available");
+  });
+%}
+
+{
+  "id": "b5875bdb-77ea-4c4f-88b9-8f1d2fe73626",
+  "name": "reservation-smoke-fa3716c3-4d6e-42bb-9880-e065fcb8029f",
+  "total_seats": 3,
+  "counts": {
+    "available": 1,
+    "held": 0,
+    "confirmed": 2
+  },
+  "seats": [
+    {
+      "seat": "A1",
+      "status": "confirmed"
+    },
+    {
+      "seat": "A2",
+      "status": "confirmed"
+    },
+    {
+      "seat": "A3",
+      "status": "available"
+    }
+  ]
+}
+
+### 18-19. Deactivate only the temporary test users; the admin account is untouched
+DELETE {{baseUrl}}/users/{{reservationBuyerOneId}}
+Authorization: Bearer {{reservationAdminToken}}
+
+###
+DELETE {{baseUrl}}/users/{{reservationBuyerTwoId}}
+Authorization: Bearer {{reservationAdminToken}}

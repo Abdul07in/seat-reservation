@@ -1,6 +1,6 @@
 # HTTP API Contract
 
-This document defines the initial JSON contract for the MVP. IDs are UUID strings. All request and response property names use `snake_case`; prices are integer paise. Business endpoints will be implemented in Phase 3.
+This document defines the JSON contract for the MVP. IDs are UUID strings. All request and response property names use `snake_case`; prices are integer paise.
 
 ## Authentication
 
@@ -65,11 +65,11 @@ Response:
 
 ## Read show state
 
-`GET /shows/{id}` returns `id`, `name`, `total_seats`, `counts` (`available`, `held`, `confirmed`), and every seat with its status. Counts must reconcile to `total_seats`.
+`GET /shows/{id}` returns `id`, `name`, `total_seats`, `counts` (`available`, `held`, `confirmed`), and every seat with its status. Holds are out of scope, so `held` currently remains zero. Counts must reconcile to `total_seats`.
 
 ## Reserve seats
 
-`POST /shows/{id}/reserve` requires an authenticated JWT and the `Idempotency-Key` header. The key is required, non-blank, and limited to 200 characters. The body does not contain a user ID.
+`POST /shows/{id}/reserve` requires an authenticated JWT and the `Idempotency-Key` header. The key is required, non-blank, and limited to 255 characters. The body does not contain a user ID.
 
 ```json
 {"seats": ["A12", "A13"]}
@@ -81,16 +81,18 @@ Seat labels must be non-empty and unique. The MVP uses all-or-nothing multi-seat
 {
   "reservation_id": "<reservation-uuid>",
   "show_id": "<show-uuid>",
-  "user_id": "buyer-123",
+  "user_id": "<user-uuid-from-token-sub>",
   "seats": ["A12", "A13"],
   "amount_paise": 50000,
   "status": "confirmed"
 }
 ```
 
+The idempotency scope is `(show_id, authenticated user_id, Idempotency-Key)`. Repeating the same seat set returns the original reservation (including its current status); using the key for a different seat set returns `409 IDEMPOTENCY_KEY_REUSED`. Unavailable seats and the per-user limit return `409 SEAT_UNAVAILABLE` and `409 USER_SEAT_LIMIT_EXCEEDED`. Seat order does not affect the request fingerprint.
+
 ## Cancel reservation
 
-`POST /reservations/{id}/cancel` requires an authenticated JWT. The service permits only the owner to cancel. Success is `200 OK` with `{"reservation_id":"<reservation-uuid>","status":"cancelled"}`.
+`POST /reservations/{id}/cancel` requires an authenticated JWT. The service permits only the owner to cancel. Cancellation is idempotent; repeating it leaves seats available and returns `200 OK` with `{"reservation_id":"<reservation-uuid>","status":"cancelled"}`.
 
 ## Errors
 
@@ -114,9 +116,9 @@ Every application error uses this shape (validation details map field names to m
 | `401` | Missing or invalid bearer token (`UNAUTHORIZED`) |
 | `403` | Valid identity without required permission (`FORBIDDEN`) |
 | `404` | Requested show or reservation does not exist (`RESOURCE_NOT_FOUND`) |
-| `409` | Expected domain conflict such as unavailable seats, limit exceeded, or idempotency-key/body mismatch (Phase 3) |
+| `409` | Expected domain conflict: `SEAT_UNAVAILABLE`, `USER_SEAT_LIMIT_EXCEEDED`, or `IDEMPOTENCY_KEY_REUSED` |
 | `500` | Unexpected server failure (`INTERNAL_ERROR`) |
 
 ## Implementation boundary
 
-Authentication and user-account routes are implemented as part of Phase 2. Show and reservation business endpoints are delivered in Phase 3.
+Authentication, user-account, show, and reservation routes are implemented. Runtime concurrency and database integration verification is tracked in Phase 4.

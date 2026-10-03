@@ -4,17 +4,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paytm.assignment.constant.ApiConstants;
 import com.paytm.assignment.constant.ApiErrorCode;
 import com.paytm.assignment.dto.response.ApiErrorResponse;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,11 +23,15 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,18 +42,27 @@ import java.util.Map;
 import static org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256;
 
 @Configuration
+@EnableConfigurationProperties(JwtProperties.class)
 public class JwtSecurityConfiguration {
 
     @Bean
-    JwtDecoder jwtDecoder(@Value("${spring.security.jwt.secret}") String secret,
-                          @Value("${spring.security.jwt.issuer}") String issuer) {
-        byte[] key = secret.getBytes(StandardCharsets.UTF_8);
+    SecretKey jwtSecretKey(JwtProperties properties) {
+        byte[] key = properties.secret().getBytes(StandardCharsets.UTF_8);
         if (key.length < 32) {
             throw new IllegalStateException("JWT_SECRET must contain at least 32 UTF-8 bytes for HS256");
         }
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(new SecretKeySpec(key, "HmacSHA256"))
-                .macAlgorithm(HS256).build();
-        OAuth2TokenValidator<Jwt> defaults = JwtValidators.createDefaultWithIssuer(issuer);
+        return new SecretKeySpec(key, "HmacSHA256");
+    }
+
+    @Bean
+    JwtEncoder jwtEncoder(SecretKey jwtSecretKey) {
+        return new NimbusJwtEncoder(new ImmutableSecret<SecurityContext>(jwtSecretKey));
+    }
+
+    @Bean
+    JwtDecoder jwtDecoder(SecretKey jwtSecretKey, JwtProperties properties) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey).macAlgorithm(HS256).build();
+        OAuth2TokenValidator<Jwt> defaults = JwtValidators.createDefaultWithIssuer(properties.issuer());
         OAuth2TokenValidator<Jwt> subjectValidator = jwt -> jwt.getSubject() != null && !jwt.getSubject().isBlank()
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new org.springframework.security.oauth2.core.OAuth2Error(

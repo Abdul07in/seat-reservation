@@ -37,7 +37,7 @@ POST {{baseUrl}}/auth/signin
 Content-Type: application/json
 
 {
-  "identifier": "seat-reservation-smoke-91443cd2-8fb2-44ab-b3e7-cc771c9cb8f4@example.test",
+  "identifier": "seat-reservation-smoke-a7fcdf4a-e733-4798-a156-ff4b79bfaa9f@example.test",
   "password": "{{testUserPassword}}"
 }
 

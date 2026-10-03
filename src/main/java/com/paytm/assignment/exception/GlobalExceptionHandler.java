@@ -8,14 +8,16 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -40,7 +42,8 @@ public class GlobalExceptionHandler {
         return createResponse(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_ERROR, "Request validation failed", request, details);
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, ConstraintViolationException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, ConstraintViolationException.class,
+            MissingRequestHeaderException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ApiErrorResponse> handleInvalidRequest(Exception exception, HttpServletRequest request) {
         return createResponse(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_REQUEST, "Request is invalid or malformed", request, Map.of());
     }
