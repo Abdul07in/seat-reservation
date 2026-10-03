@@ -11,6 +11,7 @@ Every application table has `created_by`, `created_at`, `updated_by`, and `updat
 | `reservations` | Stores a buyer's reservation and its lifecycle. `user_id` is the identity from the validated token. | `id`, `show_id`, `user_id`, `status`, `amount_paise`, `cancelled_at`, `created_by`, `created_at`, `updated_by`, `updated_at` |
 | `reservation_seats` | Connects reservations to their seats and preserves the seat list after cancellation. | `id`, `reservation_id`, `seat_id`, `created_by`, `created_at`, `updated_by`, `updated_at` |
 | `idempotency_keys` | Stores each request key, its request fingerprint, and the reservation to return on a retry. | `id`, `show_id`, `user_id`, `idempotency_key`, `request_fingerprint`, `reservation_id`, `created_by`, `created_at`, `updated_by`, `updated_at` |
+| `users` | Stores registered buyer accounts and the bootstrapped admin account. Passwords are stored only as BCrypt hashes; roles and active state support authentication and account lifecycle. | `id`, `email`, `password_hash`, `role`, `active`, `created_by`, `created_at`, `updated_by`, `updated_at` |
 
 ## Service-owned rules
 
@@ -19,4 +20,4 @@ Every application table has `created_by`, `created_at`, `updated_by`, and `updat
 - The service checks per-user limits, all-or-nothing seat availability, cancellation ownership, and idempotent replay behavior within transactions. User-scoped advisory locks and sorted seat-row locks serialize concurrent requests.
 - Prices and totals are integer paise. `request_fingerprint` contains the service-computed fingerprint used to detect a changed request with the same key.
 
-The schema and indexes are defined in the single initial Liquibase migration at `src/main/resources/db/changelog/changes/001-initial-schema.sql`.
+The schema and indexes are defined in the Liquibase migrations under `src/main/resources/db/changelog/changes/`. The users table was added in `002-users.sql` so databases that already applied the initial schema can upgrade safely.

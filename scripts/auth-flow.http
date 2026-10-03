@@ -1,0 +1,55 @@
+@baseUrl = http://localhost:8080
+@adminIdentifier = admin
+@adminPassword = admin123
+@testUserPassword = SmokeTestPass123!
+
+@adminToken = eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzZWF0LXJlc2VydmF0aW9uIiwic3ViIjoiZWE3N2Y1YWQtY2FmMy00M2Q5LTkwNTQtMTFhNmQ2NmU0ZDRhIiwiZXhwIjoxNzkxMDY2MjE5LCJpYXQiOjE3OTEwNjI2MTksInJvbGVzIjpbIkFETUlOIl19.-cQpTiCSclJywnbRaZQ7DNWRg8z3dHFlF9Ns5k_S5H8
+
+### 1. Sign in as the local bootstrap admin (development credentials by default)
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "identifier": "{{adminIdentifier}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+  client.global.set("adminToken", response.body.access_token);
+%}
+
+### 2a. Create a uniquely named test user (response captures its ID and email)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "seat-reservation-smoke-{{$guid}}@example.test",
+  "password": "{{testUserPassword}}"
+}
+
+> {%
+  client.global.set("createdUserId", response.body.id);
+  client.global.set("createdUserEmail", response.body.email);
+%}
+
+### 2b. Sign in as the test user (response captures its JWT)
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "identifier": "seat-reservation-smoke-91443cd2-8fb2-44ab-b3e7-cc771c9cb8f4@example.test",
+  "password": "{{testUserPassword}}"
+}
+
+> {%
+  client.global.set("userToken", response.body.access_token);
+%}
+
+### 3. View all users (requires admin token)
+GET {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+
+### 4. Deactivate only the test user created above; this does not delete the admin
+DELETE {{baseUrl}}/users/{{createdUserId}}
+Authorization: Bearer {{adminToken}}
+

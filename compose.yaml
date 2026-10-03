@@ -24,6 +24,10 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-seat_reservation}
       DATABASE_USERNAME: ${POSTGRES_USER:-seat_reservation}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-seat_reservation}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-deployment}
+      JWT_ISSUER: ${JWT_ISSUER:-seat-reservation}
+      ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     ports:
       - "${SERVER_PORT:-8080}:8080"
     healthcheck:

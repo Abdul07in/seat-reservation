@@ -16,6 +16,14 @@ spring:
           time_zone: UTC
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  security:
+    jwt:
+      secret: ${JWT_SECRET:local-development-secret-change-before-deployment}
+      issuer: ${JWT_ISSUER:seat-reservation}
+app:
+  bootstrap-admin:
+    identifier: ${ADMIN_IDENTIFIER:admin}
+    password: ${ADMIN_PASSWORD:admin123}
 
 server:
   error:

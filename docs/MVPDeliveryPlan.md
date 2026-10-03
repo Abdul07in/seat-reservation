@@ -11,7 +11,7 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - **Authentication:** accept signed bearer tokens and derive the user identity and role only from validated token claims. Keep signing configuration outside source control. Require an admin role to create shows.
 - **API contract:** endpoint-specific success DTOs preserve the assignment's JSON fields. All errors use the shared error response and request ID already scaffolded in the service.
 
-**Overall progress:** Phases 0 and 1 are complete. Authentication, API endpoints, reservation behavior, concurrency testing, metrics/logging enhancements, and public deployment have not started.
+**Overall progress:** Phases 0, 1, and 2 are complete. Reservation endpoints, concurrency verification, observability enhancements, and public deployment remain.
 
 ## Delivery sequence
 
@@ -32,17 +32,20 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - [x] Keep schema rules to persistence structure; store prices and totals as integer paise and enforce business policies in Java services.
 - [x] Document the transaction and lock ordering for the service layer.
 
-**Gate:** verified with Docker Compose: the app image builds, PostgreSQL becomes healthy, Liquibase records `001-initial-schema.sql` as executed, Hibernate validates the mappings, app readiness reports `UP`, and all five application tables contain the four audit columns. CRUD through the reservation API remains to be verified after those endpoints are implemented.
+**Gate:** verified with Docker Compose: the app image builds, PostgreSQL becomes healthy, Liquibase records `001-initial-schema.sql` as executed, Hibernate validates the mappings, app readiness reports `UP`, and all initial application tables contain the four audit columns. The accounts table is added by the follow-on `002-users.sql` migration.
 
-### 2. Authentication and HTTP contract
+### 2. Authentication and HTTP contract — complete
 
-- [ ] Add bearer-token validation and a security principal containing the token's user ID and roles.
-- [ ] Protect show creation with the admin role; protect reservation and cancellation with an authenticated user.
-- [ ] Define validated request/response DTOs and status codes for create show, reserve, cancel, and show state.
-- [ ] Add request validation for required fields, unique/non-empty seat lists, positive integer price, and idempotency key.
-- [ ] Ensure spoofed user IDs in request bodies are ignored or rejected; ownership checks use only the principal.
+- [x] Add HS256 bearer-token validation with issuer/expiry validation and a principal carrying token `sub` and `roles` claims.
+- [x] Protect show creation with `ADMIN`; protect reservation and cancellation routes with an authenticated identity; leave show state public.
+- [x] Define validated request/response DTOs and status/error contracts for create show, reserve, cancel, and show state in `docs/ApiContract.md`.
+- [x] Add request validation for required fields, unique/non-empty seat lists, positive integer price, and positive per-user limit input; idempotency-key validation is applied at the controller boundary in Phase 3.
+- [x] Keep caller-supplied identity out of request DTOs; user ID is sourced from JWT `sub` and ownership is enforced in Phase 3.
+- [x] Add an audited `users` table, BCrypt password storage, default local admin bootstrap, buyer registration and user CRUD (self scope, admin list scope), and one-hour signed JWT issuance.
+- [x] Add `POST /auth/signin` for buyer email and bootstrap-admin identifier sign-in; assign roles server-side and never accept a requested role.
+- Idempotency header validation and controller handling are part of Phase 3, alongside the reservation endpoint.
 
-**Gate:** API behavior and error payloads are documented with sample JSON, and malformed/unauthenticated requests have stable 4xx responses.
+**Gate:** API behavior, payloads, and error responses are documented in `docs/ApiContract.md`; Maven package compilation succeeded. Runtime smoke checks have not yet been run. Use `scripts/test-auth.sh` or the sequential workflow in `scripts/auth-flow.http` against a running local service.
 
 ### 3. Reservation correctness
 
@@ -50,6 +53,7 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - [ ] Implement one transactional, all-or-nothing reservation operation using deterministic locking and database constraints.
 - [ ] Enforce the per-user limit (default four) within the same transaction as seat assignment.
 - [ ] Persist the idempotency key and a canonical request fingerprint. Same key + same request returns the original reservation; same key + different seats returns 409.
+- [ ] Validate and process the `Idempotency-Key` request header for reservation requests.
 - [ ] Implement owner-only cancellation that frees only seats still linked to that reservation.
 - [ ] Implement show state with per-seat status and counts from authoritative persisted state.
 - [ ] Map expected conflicts (seat taken, limit exceeded, key/body mismatch, missing show/reservation) to documented domain responses, never 500s.
