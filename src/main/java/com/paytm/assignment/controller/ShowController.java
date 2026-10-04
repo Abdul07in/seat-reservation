@@ -5,6 +5,7 @@ import com.paytm.assignment.dto.response.CreateShowResponse;
 import com.paytm.assignment.dto.response.ShowStateResponse;
 import com.paytm.assignment.service.ShowService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/shows")
+@Slf4j
 public class ShowController {
 
     private final ShowService showService;
@@ -28,7 +30,10 @@ public class ShowController {
 
     @PostMapping
     public ResponseEntity<CreateShowResponse> create(@Valid @RequestBody CreateShowRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(showService.create(request));
+        log.info("show_create_request_received seat_count={}", request.seats().size());
+        CreateShowResponse show = showService.create(request);
+        log.info("show_create_response_ready status=201 show_id={}", show.id());
+        return ResponseEntity.status(HttpStatus.CREATED).body(show);
     }
 
     @GetMapping("/{id}")

@@ -5,6 +5,7 @@ import com.paytm.assignment.dto.request.UpdateUserRequest;
 import com.paytm.assignment.dto.response.UserResponse;
 import com.paytm.assignment.service.UserService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/users")
+@Slf4j
 public class UserController {
 
     private final UserService userService;
@@ -32,7 +34,10 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.create(request));
+        log.info("user_create_request_received");
+        UserResponse user = userService.create(request);
+        log.info("user_create_response_ready status=201 user_id={}", user.id());
+        return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
     @GetMapping
@@ -53,7 +58,9 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id, Authentication authentication) {
+        log.info("user_deactivation_request_received user_id={}", id);
         userService.delete(id, authentication.getName(), isAdmin(authentication));
+        log.info("user_deactivation_response_ready status=204 user_id={}", id);
         return ResponseEntity.noContent().build();
     }
 

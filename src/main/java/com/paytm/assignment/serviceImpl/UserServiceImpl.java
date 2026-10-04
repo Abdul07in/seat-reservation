@@ -10,6 +10,7 @@ import com.paytm.assignment.entity.UserEntity;
 import com.paytm.assignment.exception.ApiException;
 import com.paytm.assignment.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     private final UserRepository users;
@@ -31,6 +33,7 @@ public class UserServiceImpl implements UserService {
         String email = normalizeEmail(request.email());
         ensureEmailAvailable(email);
         UserEntity saved = users.save(new UserEntity(email, passwordEncoder.encode(request.password()), UserRole.USER));
+        log.info("user_created user_id={} role={}", saved.getId(), saved.getRole());
         return toResponse(saved);
     }
 
@@ -62,7 +65,9 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void delete(UUID id, String actorId, boolean admin) {
         ensureOwnerOrAdmin(id, actorId, admin);
-        findActive(id).deactivate();
+        UserEntity user = findActive(id);
+        user.deactivate();
+        log.info("user_deactivated user_id={}", user.getId());
     }
 
     private UserEntity findActive(UUID id) {

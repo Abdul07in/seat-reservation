@@ -15,6 +15,7 @@ import com.paytm.assignment.repository.SeatRepository;
 import com.paytm.assignment.repository.ShowRepository;
 import com.paytm.assignment.service.ShowService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ShowServiceImpl implements ShowService {
 
     private final ShowRepository shows;
@@ -51,6 +53,7 @@ public class ShowServiceImpl implements ShowService {
                 request.perUserLimit() == null ? 4 : request.perUserLimit()));
         List<SeatEntity> showSeats = normalizedLabels.stream().map(label -> new SeatEntity(show, label)).toList();
         seats.saveAll(showSeats);
+        log.info("show_created show_id={} seat_count={}", show.getId(), showSeats.size());
         return new CreateShowResponse(show.getId().toString(), show.getName(),
                 showSeats.stream().sorted(java.util.Comparator.comparing(SeatEntity::getSeatLabel))
                         .map(seat -> seatState(seat, SeatStatus.AVAILABLE)).toList());

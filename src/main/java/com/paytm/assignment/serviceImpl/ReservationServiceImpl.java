@@ -11,6 +11,7 @@ import com.paytm.assignment.entity.ReservationSeatEntity;
 import com.paytm.assignment.entity.SeatEntity;
 import com.paytm.assignment.entity.ShowEntity;
 import com.paytm.assignment.exception.ApiException;
+import com.paytm.assignment.observability.ReservationMetrics;
 import com.paytm.assignment.repository.IdempotencyKeyRepository;
 import com.paytm.assignment.repository.ReservationRepository;
 import com.paytm.assignment.repository.ReservationSeatRepository;
@@ -18,9 +19,12 @@ import com.paytm.assignment.repository.SeatRepository;
 import com.paytm.assignment.repository.ShowRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,6 +36,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReservationServiceImpl implements ReservationService {
 
     private final ShowRepository shows;
@@ -40,6 +45,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationSeatRepository reservationSeats;
     private final IdempotencyKeyRepository idempotencyKeys;
     private final EntityManager entityManager;
+    private final ReservationMetrics metrics;
 
     @Transactional
     public ReservationResponse reserve(UUID showId, String userId, String idempotencyKey, ReserveSeatsRequest request) {
@@ -56,26 +62,33 @@ public class ReservationServiceImpl implements ReservationService {
         if (previous.isPresent()) {
             IdempotencyKeyEntity key = previous.get();
             if (!key.getRequestFingerprint().equals(fingerprint)) {
+                metrics.declined("idempotency_key_reused");
                 throw new ApiException(HttpStatus.CONFLICT, ApiErrorCode.IDEMPOTENCY_KEY_REUSED,
                         "Idempotency key was already used with a different seat request");
             }
+            metrics.idempotentReplayAfterCommit();
+            afterCommit(() -> log.info("reservation_idempotent_replay show_id={} reservation_id={}",
+                    showId, key.getReservationId()));
             return responseFor(key.getReservationId());
         }
 
         List<SeatEntity> requestedSeats = seats.lockByShowIdAndSeatLabelInOrderBySeatLabel(showId, requestedLabels);
         if (requestedSeats.size() != requestedLabels.size()) {
+            metrics.declined("seat_unavailable");
             throw new ApiException(HttpStatus.CONFLICT, ApiErrorCode.SEAT_UNAVAILABLE,
                     "One or more requested seats do not exist for this show");
         }
         List<UUID> activeSeatIds = reservationSeats.findActiveSeatIds(
                 requestedSeats.stream().map(SeatEntity::getId).toList(), ReservationStatus.CONFIRMED);
         if (!activeSeatIds.isEmpty()) {
+            metrics.declined("seat_unavailable");
             throw new ApiException(HttpStatus.CONFLICT, ApiErrorCode.SEAT_UNAVAILABLE,
                     "One or more requested seats are already reserved");
         }
 
         long seatsAlreadyReserved = reservations.countSeatsByShowAndUserAndStatus(showId, userId, ReservationStatus.CONFIRMED);
         if (seatsAlreadyReserved + requestedSeats.size() > show.getPerUserLimit()) {
+            metrics.declined("user_seat_limit");
             throw new ApiException(HttpStatus.CONFLICT, ApiErrorCode.USER_SEAT_LIMIT_EXCEEDED,
                     "Reservation exceeds the per-user seat limit for this show");
         }
@@ -90,6 +103,9 @@ public class ReservationServiceImpl implements ReservationService {
         ReservationEntity reservation = reservations.saveAndFlush(new ReservationEntity(showId, userId, amountPaise));
         reservationSeats.saveAll(requestedSeats.stream().map(seat -> new ReservationSeatEntity(reservation, seat)).toList());
         idempotencyKeys.save(new IdempotencyKeyEntity(showId, userId, idempotencyKey, fingerprint, reservation.getId()));
+        metrics.reservationConfirmedAfterCommit();
+        afterCommit(() -> log.info("reservation_confirmed show_id={} reservation_id={} seat_count={}",
+                showId, reservation.getId(), requestedSeats.size()));
         return toResponse(reservation, requestedSeats.stream().map(SeatEntity::getSeatLabel).toList());
     }
 
@@ -111,6 +127,9 @@ public class ReservationServiceImpl implements ReservationService {
         if (reservation.getStatus() == ReservationStatus.CONFIRMED) {
             seats.lockAllByReservationIdOrderBySeatLabel(reservationId);
             reservation.cancel(Instant.now());
+            metrics.cancellationAfterCommit();
+            afterCommit(() -> log.info("reservation_cancelled reservation_id={} show_id={}",
+                    reservationId, reservation.getShowId()));
         }
         return reservation.getStatus().name().toLowerCase(java.util.Locale.ROOT);
     }
@@ -128,6 +147,19 @@ public class ReservationServiceImpl implements ReservationService {
         String lockKey = showId + ":" + userId;
         entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))")
                 .setParameter("lockKey", lockKey).getSingleResult();
+    }
+
+    private static void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private static String fingerprint(List<String> labels) {

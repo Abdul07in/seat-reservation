@@ -29,10 +29,16 @@ public class RequestIdFilter extends OncePerRequestFilter {
         String requestId = requestedId != null && SAFE_REQUEST_ID.matcher(requestedId).matches() ? requestedId : UUID.randomUUID().toString();
 
         MDC.put(ApiConstants.REQUEST_ID_HEADER, requestId);
+        MDC.put("traceId", requestId);
         response.setHeader(ApiConstants.REQUEST_ID_HEADER, requestId);
+        long startedAt = System.nanoTime();
         try {
             filterChain.doFilter(request, response);
         } finally {
+            long durationMs = (System.nanoTime() - startedAt) / 1_000_000;
+            log.info("http_request_completed method={} path={} status={} duration_ms={}",
+                    request.getMethod(), request.getRequestURI(), response.getStatus(), durationMs);
+            MDC.remove("traceId");
             MDC.remove(ApiConstants.REQUEST_ID_HEADER);
         }
     }

@@ -1,8 +1,12 @@
 package com.paytm.assignment.exception;
 
 import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ApiException extends RuntimeException {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiException.class);
 
     private final HttpStatus status;
     private final String code;
@@ -11,6 +15,7 @@ public class ApiException extends RuntimeException {
         super(message);
         this.status = status;
         this.code = code;
+        LOGGER.error("api_exception status={} code={}", status.value(), code);
     }
 
     public HttpStatus getStatus() {

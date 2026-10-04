@@ -11,7 +11,7 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - **Authentication:** accept signed bearer tokens and derive the user identity and role only from validated token claims. Keep signing configuration outside source control. Require an admin role to create shows.
 - **API contract:** endpoint-specific success DTOs preserve the assignment's JSON fields. All errors use the shared error response and request ID already scaffolded in the service.
 
-**Overall progress:** Phases 0 through 4 are complete. Phases 0–3 include user-reported runtime verification; Phase 4 has automated PostgreSQL integration coverage and passed verification. Observability enhancements, burst tooling, and public deployment remain.
+**Overall progress:** Phases 0 through 4 are complete. Phase 5 observability and burst tooling are implemented and verified with local smoke and 100-attempt burst runs; readiness failure behavior with PostgreSQL unavailable remains to verify. Public deployment and handoff remain.
 
 ## Delivery sequence
 
@@ -70,13 +70,13 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 
 ### 5. Observability and burst tool
 
-- [ ] Add counters for confirmed reservations, domain declines by reason, idempotent replays, and cancellations.
-- [ ] Add an available-seat gauge that can be reconciled with show state; define whether it is per-show or global and avoid unbounded metric labels.
-- [ ] Ensure structured request logs include the correlation ID and outcome; keep credentials and tokens out of logs.
-- [ ] Confirm readiness fails when PostgreSQL is unavailable while liveness remains independent of the database.
-- [ ] Add a one-command burst client that creates/uses a show, starts a hot-seat storm, exercises retries and per-user limits, and reports response distribution, 5xx count, and final reconciliation.
+- [x] Add counters for confirmed reservations, domain declines by reason, idempotent replays, and cancellations.
+- [x] Add a global available-seat gauge derived from persisted seats/reservations, with no per-show labels.
+- [x] Emit request-completion and key controller/service outcome logs with a shared `trace_id`; log domain API errors at error level before throwing, without logging request bodies, credentials, or tokens.
+- [ ] Confirm at runtime that readiness fails when PostgreSQL is unavailable while liveness remains independent of the database. The readiness group includes the `db` health indicator and the liveness group is independent by configuration.
+- [x] Add `scripts/burst.py` and document it in `docs/Docker.md`; it creates test data, runs a configurable hot-seat storm, exercises idempotent replay and per-user limits, and reports response distribution, latency, server/transport errors, metrics, and final inventory reconciliation.
 
-**Gate:** metric totals and burst output agree with the persisted/API state after a run.
+**Gate:** After correcting the burst client's `Accept` header for the Prometheus text endpoint, repeated 100-attempt local runs passed. Latest command: `python scripts/burst.py --attempts 100 --workers 20 --clients 5`; it produced one hot-seat winner, 99 expected seat conflicts, one additional reservation under the per-user limit test, four expected limit declines, a same-ID idempotent replay, no 5xx/transport errors, and reconciled inventory. The metrics endpoint returned HTTP 200, with counters and the global available-seat gauge visible alongside the API inventory. Earlier run deltas matched exactly (+3 confirmations, +99 seat declines, +4 limit declines, +1 replay, and +4 available seats). Runtime verification with PostgreSQL unavailable (readiness down, liveness up) remains. The default burst size is 20,000 attempts; use smaller settings for local smoke runs.
 
 ### 6. Container, public deployment, and handoff
 

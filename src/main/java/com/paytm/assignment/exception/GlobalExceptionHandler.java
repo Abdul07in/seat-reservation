@@ -56,7 +56,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception, HttpServletRequest request) {
-        LOGGER.error("Unhandled request failure; requestId={}", MDC.get(ApiConstants.REQUEST_ID_HEADER), exception);
+        LOGGER.error("unhandled_request_failure method={} path={}",
+                request.getMethod(), request.getRequestURI(), exception);
         return createResponse(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR, "An unexpected error occurred", request, Map.of());
     }
 
