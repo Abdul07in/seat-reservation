@@ -1,0 +1,15 @@
+{
+  "base_url": "http://localhost:8080",
+  "attempts": 100,
+  "workers": 20,
+  "clients": 10,
+  "ramp_up_seconds": 0,
+  "limit_race_requests": 5,
+  "per_user_limit": 2,
+  "price_paise": 100,
+  "timeout_seconds": 30,
+  "scenario": "all",
+  "keep_users": false,
+  "user_prefix": "burst",
+  "user_domain": "example.test"
+}
