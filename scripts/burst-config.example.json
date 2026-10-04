@@ -1,5 +1,5 @@
 {
-  "base_url": "https://seat-reservation-lrb5.onrender.com/",
+  "base_url": "http://localhost:8080",
   "attempts": 100,
   "workers": 20,
   "clients": 10,

@@ -29,7 +29,7 @@ The Render service exposes:
 - [Readiness](https://seat-reservation-lrb5.onrender.com/actuator/health/readiness): ready only when the database check is healthy.
 - [Prometheus metrics](https://seat-reservation-lrb5.onrender.com/actuator/prometheus): counters for confirmed reservations, declines by reason, idempotent replays, cancellations, and the available-seat gauge.
 
-The key Prometheus series are `seat_reservation_confirmed_total`, `seat_reservation_declined_total{reason=...}`, `seat_reservation_idempotent_replays_total`, `seat_reservation_cancellations_total`, and `seat_reservation_seats_available`. A local Grafana dashboard is provisioned at [http://localhost:3000](http://localhost:3000) when running Compose; local default login is `admin` / `admin`.
+The key Prometheus series are `seat_reservation_confirmed_total`, `seat_reservation_declined_total{reason=...}`, `seat_reservation_idempotent_replays_total`, `seat_reservation_cancellations_total`, and `seat_reservation_seats_available`.
 
 On Render, open the service in the Render Dashboard and select **Logs** to view application output. Logs include the `trace_id` and `X-Request-Id`; the API also returns `X-Request-Id` in its response header. Render's log viewer requires dashboard access; the service does not provide a public log-stream endpoint. Locally, use `docker compose logs -f app`.
 

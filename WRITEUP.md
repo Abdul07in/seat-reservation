@@ -30,7 +30,9 @@ For a 2 a.m. on-call rotation, I would page on sustained readiness failures, sus
 
 ## AI use
 
-I used OpenAI Codex as a coding assistant throughout the implementation. I supplied the assignment requirements and directed the service layout, API contract consistency, Liquibase SQL schema approach, audit fields, constants/enums placement, and interface/implementation service pattern. Codex generated and revised substantial parts of the Spring implementation, migrations, tests, Docker/Render configuration, burst client, and documentation. I reviewed the changes iteratively and ran the application, tests, and burst commands; I reported runtime output and failures, including the Prometheus content-negotiation issue, and used those results to steer fixes. The advisory-lock design, metric choices, dashboard, and deployment wiring were AI-assisted implementation decisions that I evaluated against the requirements and runtime behavior; I did not write every line unaided.
+I used OpenAI Codex / Antigravity [Free tiers ] as a coding assistant throughout the implementation. I supplied the assignment requirements and directed the service layout, API contract consistency, Liquibase SQL schema approach, audit fields, constants/enums placement, and interface/implementation service pattern. Codex generated and revised substantial parts of the Spring implementation, migrations, tests, Docker/Render configuration, burst client, and documentation. I reviewed the changes iteratively and ran the application, tests, and burst commands; I reported runtime output and failures, including the Prometheus content-negotiation issue, and used those results to steer fixes. The advisory-lock design, metric choices and deployment wiring were AI-assisted implementation decisions that I evaluated against the requirements and runtime behavior; I did not write every line unaided.
+
+In my current organization we use Github Copilot [ Sonnet 5 ] for daily coding
 
 ## What I would do next
 
