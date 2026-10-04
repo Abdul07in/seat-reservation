@@ -8,6 +8,7 @@ import os
 import statistics
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from collections import Counter
@@ -82,9 +83,9 @@ def reserve_after(scheduled_at, delay, *args):
 
 DEFAULT_CONFIG = {
     "base_url": "http://localhost:8080",
-    "attempts": 20000,
-    "workers": 200,
-    "clients": 200,
+    "attempts": 100,
+    "workers": 20,
+    "clients": 10,
     "ramp_up_seconds": 0,
     "limit_race_requests": 5,
     "per_user_limit": 2,
@@ -140,9 +141,11 @@ def validate_settings(settings, parser):
         parser.error("user-domain cannot be empty")
 
 
-def print_plan(settings, dry_run):
+def print_plan(settings, dry_run, remote):
     print("\nBurst plan (all configuration is resolved before network requests):")
     print(json.dumps(settings, indent=2))
+    if remote:
+        print("REMOTE TARGET: this run creates persistent shows/reservations; only temporary users are cleaned up.")
     stages = {
         "all": ["hot-seat contention", "idempotency replay", "per-user limit race", "metrics"],
         "hot-seat": ["hot-seat contention", "metrics"],
@@ -190,6 +193,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", help="JSON file with workload defaults; CLI options override it")
     parser.add_argument("--dry-run", action="store_true", help="print resolved plan without sending requests")
+    parser.add_argument("--allow-remote", action="store_true",
+                        help="explicitly allow requests to a non-local service")
+    parser.add_argument("--allow-high-load", action="store_true",
+                        help="allow more than 1,000 attempts against a remote service")
     parser.add_argument("--base-url")
     parser.add_argument("--attempts", type=int, help="hot-seat request count")
     parser.add_argument("--workers", type=int, help="maximum concurrent HTTP workers")
@@ -209,7 +216,8 @@ def main():
     parser.add_argument("--user-prefix", help="prefix for generated test-user emails")
     parser.add_argument("--user-domain", help="domain for generated test-user emails")
     parser.add_argument("--admin", default=os.getenv("ADMIN_IDENTIFIER", "admin"))
-    parser.add_argument("--admin-password", default=os.getenv("ADMIN_PASSWORD", "admin123"))
+    parser.add_argument("--admin-password", default=os.getenv("ADMIN_PASSWORD", "admin123"),
+                        help="admin password (default: assignment credential; may also use ADMIN_PASSWORD)")
     parser.add_argument("--user-password", default=os.getenv("BURST_USER_PASSWORD", "BurstTestPass123!"))
     args = parser.parse_args()
     settings = load_settings(args, parser)
@@ -218,7 +226,14 @@ def main():
     settings["user_domain"] = settings["user_domain"].strip().lstrip("@").lower()
     base_url = settings["base_url"].rstrip("/")
     settings["base_url"] = base_url
-    print_plan(settings, args.dry_run)
+    host = urllib.parse.urlsplit(base_url).hostname
+    remote = host not in ("localhost", "127.0.0.1", "::1")
+    if remote and not args.allow_remote:
+        parser.error("non-local targets require --allow-remote")
+    hot_seat_selected = settings["scenario"] in ("all", "hot-seat")
+    if remote and hot_seat_selected and settings["attempts"] > 1000 and not args.allow_high_load:
+        parser.error("remote runs above 1,000 hot-seat attempts also require --allow-high-load")
+    print_plan(settings, args.dry_run, remote)
     if args.dry_run:
         return
     timeout = settings["timeout_seconds"]

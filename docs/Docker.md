@@ -62,12 +62,15 @@ The default run sends 20,000 hot-seat attempts using up to 200 workers and 200 b
 python scripts/burst.py --attempts 100 --workers 20 --clients 10
 ```
 
-Choose a stage with `--scenario all|hot-seat|idempotency|user-limit`. Other controls include ramp-up duration, per-request timeout, number of seats in the user-limit race, the show's per-user cap and price, generated email prefix/domain, and whether temporary users should be kept. For example:
+Choose a stage with `--scenario all|hot-seat|idempotency|user-limit`. Other controls include ramp-up duration, per-request timeout, number of seats in the user-limit race, the show's per-user cap and price, generated email prefix/domain, and whether temporary users should be kept. Non-local targets require `--allow-remote`; remote hot-seat runs over 1,000 attempts also require `--allow-high-load`. A remote run creates persistent shows/reservations, so start small and review the plan first. For example:
 
 ```bash
 python scripts/burst.py --scenario hot-seat --attempts 500 --workers 50 --clients 25 --ramp-up-seconds 10 --timeout-seconds 30 --dry-run
 python scripts/burst.py --config scripts/burst-config.example.json --scenario user-limit
+python scripts/burst.py --config scripts/burst-render-config.example.json --allow-remote --dry-run
 ```
+
+To run that Render profile, remove `--dry-run`. The script defaults to the assignment credentials `admin` / `admin123`; use `ADMIN_IDENTIFIER` and `ADMIN_PASSWORD` or CLI options if the deployed credentials differ. The Render profile is intentionally limited to 100 attempts; the script never selects a remote host by default.
 
 On PowerShell, the same commands work with `py` if `python` is not on `PATH`:
 

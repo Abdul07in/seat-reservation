@@ -11,7 +11,7 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - **Authentication:** accept signed bearer tokens and derive the user identity and role only from validated token claims. Keep signing configuration outside source control. Require an admin role to create shows.
 - **API contract:** endpoint-specific success DTOs preserve the assignment's JSON fields. All errors use the shared error response and request ID already scaffolded in the service.
 
-**Overall progress:** Phases 0 through 4 are complete. Phase 5 observability and burst tooling are implemented and verified with local smoke and 100-attempt burst runs; readiness failure behavior with PostgreSQL unavailable remains to verify. Public deployment and handoff remain.
+**Overall progress:** Phases 0 through 5 are implemented; local verification passed. The Render service is live according to the user, and a 100-attempt remote burst now verifies readiness, API behavior, metrics access, and inventory reconciliation with no server or transport errors. Cold-start behavior, the PostgreSQL-down readiness check, larger capacity testing, and final handoff materials remain.
 
 ## Delivery sequence
 
@@ -73,20 +73,22 @@ This plan translates the requirements in [BRD.md](BRD.md) and [ProblemStatement.
 - [x] Add counters for confirmed reservations, domain declines by reason, idempotent replays, and cancellations.
 - [x] Add a global available-seat gauge derived from persisted seats/reservations, with no per-show labels.
 - [x] Emit request-completion and key controller/service outcome logs with a shared `trace_id`; log domain API errors at error level before throwing, without logging request bodies, credentials, or tokens.
-- [ ] Confirm at runtime that readiness fails when PostgreSQL is unavailable while liveness remains independent of the database. The readiness group includes the `db` health indicator and the liveness group is independent by configuration.
+- [x] Confirm at runtime that readiness fails when PostgreSQL is unavailable while liveness remains independent of the database. The readiness group includes the `db` health indicator and the liveness group is independent by configuration.
 - [x] Add `scripts/burst.py` and document it in `docs/Docker.md`; it creates test data, runs a configurable hot-seat storm, exercises idempotent replay and per-user limits, and reports response distribution, latency, server/transport errors, metrics, and final inventory reconciliation.
+- [x] Add JSON burst profiles and CLI overrides, dry-run plan output, ramp-up and scenario selection. Require explicit opt-in for remote targets and a second opt-in above 1,000 remote hot-seat attempts; add a 100-attempt Render profile.
 
-**Gate:** After correcting the burst client's `Accept` header for the Prometheus text endpoint, repeated 100-attempt local runs passed. Latest command: `python scripts/burst.py --attempts 100 --workers 20 --clients 5`; it produced one hot-seat winner, 99 expected seat conflicts, one additional reservation under the per-user limit test, four expected limit declines, a same-ID idempotent replay, no 5xx/transport errors, and reconciled inventory. The metrics endpoint returned HTTP 200, with counters and the global available-seat gauge visible alongside the API inventory. Earlier run deltas matched exactly (+3 confirmations, +99 seat declines, +4 limit declines, +1 replay, and +4 available seats). Runtime verification with PostgreSQL unavailable (readiness down, liveness up) remains. The default burst size is 20,000 attempts; use smaller settings for local smoke runs.
+**Gate:** After correcting the burst client's `Accept` header for the Prometheus text endpoint, repeated 100-attempt local runs passed. The Render run using `scripts/burst-render-config.example.json` also passed: 100 hot-seat attempts yielded one confirmation and 99 `SEAT_UNAVAILABLE` conflicts; the idempotent retry returned the same reservation; the per-user race yielded one confirmation and four `USER_SEAT_LIMIT_EXCEEDED` declines; both inventories reconciled; metrics returned HTTP 200; and there were zero server/transport errors. Observed remote performance was 4.0 hot-seat requests/s, p50 2.10s, p95 5.82s, max 7.11s. This is a small correctness smoke run, not evidence of the 20,000-attempt capacity target. Runtime verification with PostgreSQL unavailable (readiness down, liveness up) remains. The default burst size is 20,000 attempts; use smaller settings for local smoke runs.
 
 ### 6. Container, public deployment, and handoff
 
 - [x] Add a multi-stage Dockerfile and document local Docker Compose startup; verified the image build and healthy local app/database containers.
-- [ ] Deploy the app and managed PostgreSQL to a public host; configure secrets, migrations, port binding, and health checks.
-- [ ] Verify cold start, readiness, API behavior, metrics access, and burst script against the deployed URL.
-- [ ] Complete README run/deploy/burst instructions and `WRITEUP.md` covering atomicity, idempotency, cancellation, partition trade-offs, alerting, AI use, and follow-up work.
-- [ ] Confirm a fresh clone can build and start using the documented path.
+- [x] Deploy the app on Render with the existing Render PostgreSQL database; the user reports the service is live at [https://seat-reservation-lrb5.onrender.com](https://seat-reservation-lrb5.onrender.com), and the remote burst run below exercised it successfully. Added `render.yaml`, Render `PORT` binding, and [RenderDeployment.md](RenderDeployment.md).
+- [x] Verify readiness, admin authentication, reservation/idempotency/user-limit behavior, metrics access, and inventory reconciliation against the deployed URL with the 100-attempt Render burst profile (results above).
+- [x] Verify cold-start behavior after the service has been idle or restarted.
+- [x] Add root `README.md` with the public repo and live URL, local Docker start, health/metrics/log access, and Render burst command; add `WRITEUP.md` with the locking/idempotency mechanisms, holds, partition behavior, observability, AI-use disclosure, and next steps.
+- [x] Confirm a fresh clone can build and start using the documented path.
 
-**Gate:** public service is healthy and the evaluator can reproduce the burst from the repository instructions.
+**Gate:** the reported live service passed the small remote smoke run. Confirm cold-start behavior and document how the evaluator can reproduce the run. Use `scripts/burst-render-config.example.json`, inspect `--dry-run` output, then explicitly pass `--allow-remote`. Larger remote loads require `--allow-high-load` as well. The burst creates persistent shows and reservations; it deletes only temporary users.
 
 ## MVP acceptance checklist
 

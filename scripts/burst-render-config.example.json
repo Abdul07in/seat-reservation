@@ -1,15 +1,15 @@
 {
-  "base_url": "https://seat-reservation-lrb5.onrender.com/",
+  "base_url": "https://seat-reservation-lrb5.onrender.com",
   "attempts": 100,
-  "workers": 20,
+  "workers": 10,
   "clients": 10,
   "ramp_up_seconds": 0,
   "limit_race_requests": 5,
   "per_user_limit": 2,
   "price_paise": 100,
-  "timeout_seconds": 30,
+  "timeout_seconds": 90,
   "scenario": "all",
   "keep_users": false,
-  "user_prefix": "burst",
+  "user_prefix": "burst-render",
   "user_domain": "example.test"
 }
